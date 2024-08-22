@@ -1,0 +1,105 @@
+#!/bin/bash
+
+# Clear the screen to refresh the dashboard
+function clear_screen() {
+    clear
+}
+
+# Display top 10 applications by CPU and memory usage
+function display_top_apps() {
+    echo "Top 10 Applications by CPU Usage:"
+    ps aux --sort=-%cpu | head -n 11
+    echo ""
+    echo "Top 10 Applications by Memory Usage:"
+    ps aux --sort=-%mem | head -n 11
+}
+
+# Monitor network statistics
+function monitor_network() {
+    echo "Concurrent Connections:"
+    ss -tn state established | wc -l
+    echo ""
+    echo "Packet Drops:"
+    netstat -i | awk '/^[^ lo]/ {print $1, $3, $4}' | while read -r iface recv err; do
+        echo "$iface - Dropped packets: $err"
+    done
+    echo ""
+    echo "Network Throughput (MB/s):"
+    ifstat -i eth0 1 1 | tail -n 1
+}
+
+# Display disk usage and highlight high usage
+function show_disk_usage() {
+    df -h
+    echo ""
+    echo "Partitions Over 80% Usage:"
+    df -h | awk '$5 > 80 {print}'
+}
+
+# Show system load and CPU breakdown
+function show_system_load() {
+    echo "System Load Average:"
+    uptime
+    echo ""
+    echo "CPU Usage Breakdown:"
+    mpstat
+}
+
+# Display memory and swap usage
+function show_memory_usage() {
+    echo "Memory Usage:"
+    free -h
+    echo ""
+    echo "Swap Usage:"
+    swapon --show
+}
+
+# Show process statistics
+function show_process_info() {
+    echo "Number of Active Processes:"
+    ps aux | wc -l
+    echo ""
+    echo "Top 5 Processes by CPU Usage:"
+    ps aux --sort=-%cpu | head -n 6
+    echo ""
+    echo "Top 5 Processes by Memory Usage:"
+    ps aux --sort=-%mem | head -n 6
+}
+
+# Check the status of essential services
+function check_services() {
+    echo "Service Status:"
+    for service in sshd nginx apache2 iptables; do
+        systemctl is-active --quiet $service && echo "$service is running" || echo "$service is not running"
+    done
+}
+
+# Main function to handle command-line arguments
+function main() {
+    while getopts ":cpu memory network disk load mem proc service" opt; do
+        case $opt in
+            cpu) display_top_apps ;;
+            memory) show_memory_usage ;;
+            network) monitor_network ;;
+            disk) show_disk_usage ;;
+            load) show_system_load ;;
+            proc) show_process_info ;;
+            service) check_services ;;
+            \?) echo "Invalid option: -$OPTARG" >&2 ;;
+        esac
+    done
+
+    if [ $OPTIND -eq 1 ]; then
+        clear_screen
+        display_top_apps
+        monitor_network
+        show_disk_usage
+        show_system_load
+        show_memory_usage
+        show_process_info
+        check_services
+    fi
+}
+
+# Run the main function
+main "$@"
