@@ -1,0 +1,111 @@
+
+---
+
+### Set 2: Script for Automating Security Audits and Server Hardening on Linux Servers
+
+#### Task: Building a Comprehensive Security Audit and Hardening Script
+
+Imagine you're a digital security detective. Your mission is to ensure that every server is fortified against potential threats and is compliant with best practices. This script is like your investigative toolkit, automating security checks and applying hardening measures.
+
+#### Concept Overview
+
+The script will:
+
+1. **Audit Security:** Check users, permissions, services, and network configurations.
+2. **Harden the Server:** Apply security best practices to fortify the server.
+
+#### The Script
+
+```bash
+#!/bin/bash
+
+# Function to list users and groups, and check for root privileges
+function audit_users_groups() {
+    echo "Listing Users and Groups:"
+    cut -d: -f1 /etc/passwd
+    echo ""
+    echo "Users with UID 0 (Root Privileges):"
+    awk -F: '$3 == 0 {print $1}' /etc/passwd
+    echo ""
+    echo "Users with No Passwords or Weak Passwords:"
+    awk -F: '($2 == "" || $2 == "x") {print $1}' /etc/shadow
+}
+
+# Function to check file permissions
+function check_file_permissions() {
+    echo "World-Writable Files and Directories:"
+    find / -perm -o+w -type f -exec ls -ld {} \; 2>/dev/null
+    echo ""
+    echo "SUID/SGID Bits Set:"
+    find / -perm -4000 -o -perm -2000 -type f -exec ls -ld {} \; 2>/dev/null
+}
+
+# Function to list and check services
+function audit_services() {
+    echo "Currently Running Services:"
+    systemctl list-units --type=service --state=running
+    echo ""
+    echo "Status of Critical Services:"
+    for service in sshd nginx apache2 iptables; do
+        systemctl is-active --quiet $service && echo "$service is active" || echo "$service is inactive"
+    done
+}
+
+# Function to check firewall and network settings
+function check_firewall_network() {
+    echo "Firewall Status:"
+    ufw status verbose || iptables -L -v -n
+    echo ""
+    echo "Open Ports:"
+    netstat -tuln
+}
+
+# Function to display IP and network configurations
+function display_ip_network() {
+    echo "Assigned IP Addresses:"
+    ip addr show
+    echo ""
+    echo "Public vs. Private IPs:"
+    ip -4 addr | grep inet
+}
+
+# Function to check for security updates
+function check_security_updates() {
+    echo "Checking for Security Updates:"
+    apt list --upgradable | grep -i security
+}
+
+# Function to monitor logs for suspicious activities
+function monitor_logs() {
+    echo "Recent Suspicious Log Entries:"
+    grep -i "failed\|denied\|error" /var/log/auth.log
+}
+
+# Function to apply server hardening steps
+function apply_hardening() {
+    echo "Applying Hardening Measures:"
+    # Example: Disable root password authentication for SSH
+    echo "Disabling Root Password Authentication for SSH..."
+    sed -i '/^PermitRootLogin/s/.*/PermitRootLogin no/' /etc/ssh/sshd_config
+    systemctl restart sshd
+
+    # Example: Secure the GRUB bootloader
+    echo "Securing the GRUB Bootloader..."
+    grub-mkpasswd-pbkdf2 | tee -a /etc/grub.d/40_custom
+    update-grub
+}
+
+# Main function to execute all security checks
+function main() {
+    audit_users_groups
+    check_file_permissions
+    audit_services
+    check_firewall_network
+    display_ip_network
+    check_security_updates
+    monitor_logs
+    apply_hardening
+}
+
+# Execute the main function
+main
